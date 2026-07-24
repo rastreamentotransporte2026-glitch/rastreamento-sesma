@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rastreamento SESMA - Motorista</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: Arial, sans-serif;
+    background: #f2f2f2;
+    margin: 0;
+    padding: 16px;
+    display: flex;
+    justify-content: center;
+  }
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    max-width: 420px;
+    width: 100%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  h1 {
+    font-size: 20px;
+    margin-top: 0;
+    text-align: center;
+  }
+  .aviso {
+    background: #fff3cd;
+    border: 1px solid #ffe08a;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 14px;
+    margin-bottom: 18px;
+    line-height: 1.4;
+  }
+  label {
+    display: block;
+    font-size: 14px;
+    margin-top: 12px;
+    margin-bottom: 4px;
+  }
+  input {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+  button {
+    width: 100%;
+    padding: 14px;
+    font-size: 16px;
+    border: none;
+    border-radius: 8px;
+    margin-top: 20px;
+    cursor: pointer;
+  }
+  #btnIniciar {
+    background: #2e7d32;
+    color: #fff;
+  }
+  #btnFinalizar {
+    background: #c62828;
+    color: #fff;
+    display: none;
+  }
+  #status {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    display: none;
+  }
+  .status-ativo {
+    background: #e8f5e9;
+    border: 1px solid #a5d6a7;
+    color: #2e7d32;
+  }
+  .status-erro {
+    background: #ffebee;
+    border: 1px solid #ef9a9a;
+    color: #c62828;
+  }
+  #tela-corrida { display: none; }
+  #tela-form { display: block; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Controle de Tráfego - SESMA</h1>
+
+  <div class="aviso">
+    Ao iniciar a corrida, a localização e a velocidade deste veículo ficarão registradas durante o trajeto. Essa informação é usada para controle de tráfego e segurança (inclusive em caso de assalto). O monitoramento é encerrado quando você finalizar a corrida.
+  </div>
+
+  <div id="tela-form">
+    <label for="placa">Placa do veículo</label>
+    <input type="text" id="placa" placeholder="Ex: ABC-1234" autocapitalize="characters">
+
+    <label for="modelo">Modelo do veículo</label>
+    <input type="text" id="modelo" placeholder="Ex: Fiat Strada">
+
+    <label for="nome">Seu nome</label>
+    <input type="text" id="nome" placeholder="Nome completo">
+
+    <label for="matricula">Matrícula</label>
+    <input type="text" id="matricula" placeholder="Ex: 1912950-011">
+
+    <label for="departamento">Departamento</label>
+    <input type="text" id="departamento" placeholder="Ex: Devisa">
+
+    <label for="setor">Setor</label>
+    <input type="text" id="setor" placeholder="Ex: Alimentos">
+
+    <button id="btnIniciar">Iniciar corrida e ativar localização</button>
+  </div>
+
+  <div id="tela-corrida">
+    <div class="aviso" style="background:#e8f5e9;border-color:#a5d6a7;color:#2e7d32;">
+      Corrida em andamento. Localização sendo registrada.
+    </div>
+    <button id="btnFinalizar" style="display:block;">Finalizar corrida</button>
+  </div>
+
+  <div id="status"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://lfjkcozifntthmtqxtjr.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_culet5DEMmt9cxnYhIw82Q_ctH0XoTv";
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const INTERVALO_MS = 60000; // 1 minuto
+  const LIMITE_EXCESSO_KMH = 110;
+  const LIMITE_PARADA_KMH = 8;
+  const TEMPO_PARADA_SUSPEITA_MS = 10 * 60 * 1000; // 10 minutos
+
+  let viagemId = null;
+  let watchId = null;
+  let intervalId = null;
+  let ultimaPosicao = null;
+  let inicioVelocidadeBaixa = null;
+
+  function mostrarStatus(msg, tipo) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.className = tipo === 'erro' ? 'status-erro' : 'status-ativo';
+  }
+
+  function kmhFromMs(speedMs) {
+    if (speedMs === null || speedMs === undefined || isNaN(speedMs)) return null;
+    return speedMs * 3.6;
+  }
+
+  async function registrarAlerta(tipo, valor) {
+    try {
+      await db.from('alertas').insert({
+        viagem_id: viagemId,
+        placa: document.getElementById('placa').value.trim().toUpperCase(),
+        tipo: tipo,
+        valor: valor
+      });
+    } catch (e) {
+      console.error('Erro ao registrar alerta', e);
+    }
+  }
+
+  async function enviarPosicao(lat, lng, velocidadeKmh) {
+    try {
+      await db.from('posicoes').insert({
+        viagem_id: viagemId,
+        lat: lat,
+        lng: lng,
+        velocidade: velocidadeKmh
+      });
+
+      const placa = document.getElementById('placa').value.trim().toUpperCase();
+      const modelo = document.getElementById('modelo').value.trim();
+      const departamento = document.getElementById('departamento').value.trim();
+      const setor = document.getElementById('setor').value.trim();
+
+      await db.from('veiculos').upsert({
+        placa: placa,
+        modelo: modelo,
+        departamento: departamento,
+        setor: setor,
+        ultima_lat: lat,
+        ultima_lng: lng,
+        ultima_velocidade: velocidadeKmh,
+        ultima_atualizacao: new Date().toISOString()
+      });
+
+      if (velocidadeKmh !== null) {
+        if (velocidadeKmh > LIMITE_EXCESSO_KMH) {
+          registrarAlerta('excesso_velocidade', velocidadeKmh);
+        }
+        if (velocidadeKmh < LIMITE_PARADA_KMH) {
+          if (!inicioVelocidadeBaixa) {
+            inicioVelocidadeBaixa = Date.now();
+          } else if (Date.now() - inicioVelocidadeBaixa > TEMPO_PARADA_SUSPEITA_MS) {
+            registrarAlerta('parada_suspeita', velocidadeKmh);
+            inicioVelocidadeBaixa = Date.now();
+          }
+        } else {
+          inicioVelocidadeBaixa = null;
+        }
+      }
+
+      mostrarStatus('Localização enviada às ' + new Date().toLocaleTimeString('pt-BR'), 'ativo');
+    } catch (e) {
+      console.error('Erro ao enviar posição', e);
+      mostrarStatus('Erro ao enviar localização. Verifique sua internet.', 'erro');
+    }
+  }
+
+  function capturarPosicaoAtual() {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        ultimaPosicao = pos;
+        const velocidadeKmh = kmhFromMs(pos.coords.speed);
+        enviarPosicao(pos.coords.latitude, pos.coords.longitude, velocidadeKmh);
+      },
+      (err) => {
+        console.error('Erro de geolocalização', err);
+        mostrarStatus('Não foi possível obter a localização. Verifique se a permissão de localização está ativada no navegador.', 'erro');
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    );
+  }
+
+  document.getElementById('btnIniciar').addEventListener('click', async () => {
+    const placa = document.getElementById('placa').value.trim().toUpperCase();
+    const modelo = document.getElementById('modelo').value.trim();
+    const nome = document.getElementById('nome').value.trim();
+    const matricula = document.getElementById('matricula').value.trim();
+    const departamento = document.getElementById('departamento').value.trim();
+    const setor = document.getElementById('setor').value.trim();
+
+    if (!placa || !nome || !matricula) {
+      mostrarStatus('Preencha placa, nome e matrícula antes de iniciar.', 'erro');
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      mostrarStatus('Este navegador não suporta localização.', 'erro');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { data, error } = await db.from('viagens').insert({
+            placa: placa,
+            motorista_nome: nome,
+            matricula: matricula,
+            status: 'ativa'
+          }).select().single();
+
+          if (error) throw error;
+
+          viagemId = data.id;
+
+          await db.from('veiculos').upsert({
+            placa: placa,
+            modelo: modelo,
+            departamento: departamento,
+            setor: setor
+          });
+
+          document.getElementById('tela-form').style.display = 'none';
+          document.getElementById('tela-corrida').style.display = 'block';
+
+          enviarPosicao(pos.coords.latitude, pos.coords.longitude, kmhFromMs(pos.coords.speed));
+          intervalId = setInterval(capturarPosicaoAtual, INTERVALO_MS);
+        } catch (e) {
+          console.error('Erro ao iniciar corrida', e);
+          mostrarStatus('Erro ao iniciar a corrida. Tente novamente.', 'erro');
+        }
+      },
+      (err) => {
+        console.error('Erro de geolocalização', err);
+        mostrarStatus('Não foi possível ativar a localização. Verifique as permissões do navegador e tente novamente.', 'erro');
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    );
+  });
+
+  document.getElementById('btnFinalizar').addEventListener('click', async () => {
+    if (!viagemId) return;
+    try {
+      await db.from('viagens').update({
+        status: 'finalizada',
+        fim: new Date().toISOString()
+      }).eq('id', viagemId);
+
+      if (intervalId) clearInterval(intervalId);
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+
+      document.getElementById('tela-corrida').style.display = 'none';
+      document.getElementById('tela-form').style.display = 'block';
+      mostrarStatus('Corrida finalizada. Obrigado!', 'ativo');
+      viagemId = null;
+    } catch (e) {
+      console.error('Erro ao finalizar corrida', e);
+      mostrarStatus('Erro ao finalizar a corrida. Tente novamente.', 'erro');
+    }
+  });
+
+  // Verifica periodicamente se a corrida foi encerrada pelo administrador
+  async function verificarStatusCorrida() {
+    if (!viagemId) return;
+    try {
+      const { data, error } = await db.from('viagens').select('status').eq('id', viagemId).single();
+      if (error) return;
+      if (data && data.status === 'finalizada') {
+        if (intervalId) clearInterval(intervalId);
+        document.getElementById('tela-corrida').style.display = 'none';
+        document.getElementById('tela-form').style.display = 'block';
+        mostrarStatus('Corrida encerrada pelo administrador.', 'ativo');
+        viagemId = null;
+      }
+    } catch (e) {
+      console.error('Erro ao verificar status', e);
+    }
+  }
+  setInterval(verificarStatusCorrida, 30000);
+</script>
+</body>
+</html>
