@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Rastreamento - SESMA</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: Arial, sans-serif;
+    background: #f2f2f2;
+    margin: 0;
+  }
+  header {
+    background: #fff;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  header img {
+    height: 40px;
+  }
+  header h1 {
+    font-size: 16px;
+    margin: 0;
+    flex: 1;
+  }
+  header .usuario {
+    font-size: 13px;
+    color: #555;
+    text-align: right;
+  }
+  header button.sair {
+    background: #eee;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  #tela-login {
+    max-width: 380px;
+    margin: 60px auto;
+    background: #fff;
+    padding: 24px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    text-align: center;
+  }
+  #tela-login img { height: 60px; margin-bottom: 12px; }
+  #tela-login h2 { font-size: 18px; margin-top: 0; }
+  .campo-senha {
+    position: relative;
+  }
+  .campo-senha input {
+    width: 100%;
+    padding: 10px 40px 10px 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+  .campo-senha .olho {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    font-size: 12px;
+    user-select: none;
+    color: #2e7d32;
+    font-weight: bold;
+    background: #fff;
+    padding: 2px 4px;
+  }
+  #tela-login button {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: none;
+    border-radius: 8px;
+    background: #2e7d32;
+    color: #fff;
+    margin-top: 14px;
+    cursor: pointer;
+  }
+  #erro-login {
+    color: #c62828;
+    font-size: 13px;
+    margin-top: 10px;
+    display: none;
+  }
+
+  #app { display: none; }
+
+  nav {
+    display: flex;
+    background: #fff;
+    border-bottom: 1px solid #ddd;
+    overflow-x: auto;
+  }
+  nav button {
+    padding: 12px 16px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 14px;
+    color: #555;
+    border-bottom: 3px solid transparent;
+    white-space: nowrap;
+  }
+  nav button.ativo {
+    color: #2e7d32;
+    border-bottom: 3px solid #2e7d32;
+    font-weight: bold;
+  }
+
+  main {
+    padding: 16px;
+  }
+  .painel-secao { display: none; }
+  .painel-secao.ativo { display: block; }
+
+  #mapa {
+    height: 420px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+  }
+
+  .veiculo-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .veiculo-info b { font-size: 15px; }
+  .veiculo-info div { font-size: 13px; color: #555; }
+  .badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    margin-left: 6px;
+  }
+  .badge-ativo { background: #e8f5e9; color: #2e7d32; }
+  .badge-recolhido { background: #eee; color: #666; }
+  .badge-alerta { background: #ffebee; color: #c62828; }
+
+  button.encerrar {
+    background: #c62828;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  th, td {
+    padding: 10px;
+    text-align: left;
+    font-size: 13px;
+    border-bottom: 1px solid #eee;
+  }
+  th { background: #fafafa; }
+
+  .form-token {
+    background: #fff;
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    max-width: 480px;
+  }
+  .form-token label { display: block; font-size: 13px; margin-top: 10px; margin-bottom: 4px; }
+  .form-token input, .form-token select {
+    width: 100%;
+    padding: 8px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+  .form-token button {
+    margin-top: 14px;
+    padding: 10px 16px;
+    background: #2e7d32;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .toggle-ativo {
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  #config-logo {
+    background: #fff;
+    padding: 16px;
+    border-radius: 8px;
+    max-width: 480px;
+  }
+
+  .vazio {
+    color: #888;
+    font-size: 14px;
+    padding: 20px;
+    text-align: center;
+  }
+
+  #cabecalhoImpressao { text-align: center; margin-bottom: 16px; }
+  #cabecalhoImpressao img { height: 50px; }
+  #cabecalhoImpressao h2 { margin: 8px 0 4px 0; font-size: 18px; }
+  #infoImpressao { font-size: 12px; color: #555; }
+
+  @media print {
+    header, nav, .form-token, #navTokens, #navConfig, button { display: none !important; }
+    #btnImprimirRelatorio { display: none !important; }
+    #modalApagarVeiculo { display: none !important; }
+    #cabecalhoImpressao { display: block !important; }
+    .painel-secao { display: block !important; }
+    section:not(#secao-relatorios) { display: none !important; }
+    main { padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div id="tela-login">
+  <img src="https://lfjkcozifntthmtqxtjr.supabase.co/storage/v1/object/public/arquivos/logo.png.jpg" alt="Logo">
+  <h2>Painel de Rastreamento</h2>
+  <div class="campo-senha">
+    <input type="password" id="tokenInput" placeholder="Digite seu token de acesso">
+    <span class="olho" id="olhoToggle">mostrar</span>
+  </div>
+  <button id="btnEntrar">Entrar</button>
+  <div id="erro-login">Token inválido ou inativo.</div>
+</div>
+
+<div id="app">
+  <header>
+    <img src="https://lfjkcozifntthmtqxtjr.supabase.co/storage/v1/object/public/arquivos/logo.png.jpg" alt="Logo" id="logoHeader">
+    <h1>Rastreamento de Veículos - SESMA</h1>
+    <div class="usuario">
+      <div id="nomeUsuario"></div>
+      <div id="nivelUsuario" style="color:#2e7d32;"></div>
+    </div>
+    <button class="sair" id="btnSair">Sair</button>
+  </header>
+
+  <nav>
+    <button data-aba="mapa" class="ativo">Mapa</button>
+    <button data-aba="veiculos">Veículos</button>
+    <button data-aba="alertas">Alertas</button>
+    <button data-aba="relatorios">Relatórios</button>
+    <button data-aba="tokens" id="navTokens" style="display:none;">Tokens</button>
+    <button data-aba="config" id="navConfig" style="display:none;">Configurações</button>
+  </nav>
+
+  <main>
+    <section class="painel-secao ativo" id="secao-mapa">
+      <div id="mapa"></div>
+      <div id="listaAtivos"></div>
+    </section>
+
+    <section class="painel-secao" id="secao-veiculos">
+      <h2 style="font-size:16px;">Todos os veículos</h2>
+      <div id="listaVeiculos"></div>
+    </section>
+
+    <section class="painel-secao" id="secao-alertas">
+      <h2 style="font-size:16px;">Alertas registrados</h2>
+      <table>
+        <thead>
+          <tr><th>Placa</th><th>Tipo</th><th>Valor (km/h)</th><th>Horário</th></tr>
+        </thead>
+        <tbody id="tabelaAlertas"></tbody>
+      </table>
+    </section>
+
+    <section class="painel-secao" id="secao-relatorios">
+      <h2 style="font-size:16px;">Relatórios</h2>
+      <div class="form-token" style="max-width:100%;">
+        <div style="display:flex;flex-wrap:wrap;gap:12px;">
+          <div style="flex:1;min-width:150px;">
+            <label>De</label>
+            <input type="date" id="filtroDataInicio">
+          </div>
+          <div style="flex:1;min-width:150px;">
+            <label>Até</label>
+            <input type="date" id="filtroDataFim">
+          </div>
+          <div style="flex:1;min-width:150px;">
+            <label>Placa (opcional)</label>
+            <input type="text" id="filtroPlaca" placeholder="Ex: ABC-1234">
+          </div>
+          <div style="flex:1;min-width:150px;">
+            <label>Departamento (opcional)</label>
+            <input type="text" id="filtroDepartamentoRelatorio" placeholder="Ex: Devisa">
+          </div>
+        </div>
+        <button id="btnGerarRelatorio">Gerar relatório</button>
+        <button id="btnImprimirRelatorio" style="display:none;background:#555;color:#fff;border:none;border-radius:6px;padding:10px 16px;cursor:pointer;margin-top:10px;margin-left:8px;">Imprimir</button>
+        <button id="btnExportarExcel" style="display:none;background:#1b5e20;color:#fff;border:none;border-radius:6px;padding:10px 16px;cursor:pointer;margin-top:10px;margin-left:8px;">Exportar Excel</button>
+        <button id="btnExportarPdf" style="display:none;background:#b71c1c;color:#fff;border:none;border-radius:6px;padding:10px 16px;cursor:pointer;margin-top:10px;margin-left:8px;">Exportar PDF</button>
+      </div>
+
+      <div id="cabecalhoImpressao" style="display:none;">
+        <img src="https://lfjkcozifntthmtqxtjr.supabase.co/storage/v1/object/public/arquivos/logo.png.jpg" alt="Logo">
+        <h2>Relatório de Rastreamento - SESMA</h2>
+        <div id="infoImpressao"></div>
+      </div>
+
+      <div id="resumoRelatorio" style="display:none;">
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+          <div class="veiculo-card" style="flex:1;min-width:140px;flex-direction:column;align-items:flex-start;">
+            <div style="font-size:13px;color:#555;">Corridas</div>
+            <div style="font-size:22px;font-weight:bold;" id="resCorridas">-</div>
+          </div>
+          <div class="veiculo-card" style="flex:1;min-width:140px;flex-direction:column;align-items:flex-start;">
+            <div style="font-size:13px;color:#555;">Km percorridos (aprox.)</div>
+            <div style="font-size:22px;font-weight:bold;" id="resKm">-</div>
+          </div>
+          <div class="veiculo-card" style="flex:1;min-width:140px;flex-direction:column;align-items:flex-start;">
+            <div style="font-size:13px;color:#555;">Excessos de velocidade</div>
+            <div style="font-size:22px;font-weight:bold;color:#c62828;" id="resExcessos">-</div>
+          </div>
+          <div class="veiculo-card" style="flex:1;min-width:140px;flex-direction:column;align-items:flex-start;">
+            <div style="font-size:13px;color:#555;">Paradas suspeitas</div>
+            <div style="font-size:22px;font-weight:bold;color:#e65100;" id="resParadas">-</div>
+          </div>
+          <div class="veiculo-card" style="flex:1;min-width:140px;flex-direction:column;align-items:flex-start;">
+            <div style="font-size:13px;color:#555;">Velocidade média</div>
+            <div style="font-size:22px;font-weight:bold;" id="resVelMedia">-</div>
+          </div>
+          <div class="veiculo-card" style="flex:1;min-width:140px;flex-direction:column;align-items:flex-start;">
+            <div style="font-size:13px;color:#555;">Tempo total de deslocamento</div>
+            <div style="font-size:22px;font-weight:bold;" id="resTempo">-</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr><th>Placa</th><th>Motorista</th><th>Departamento</th><th>Início</th><th>Fim</th><th>Km aprox.</th><th>Tempo</th><th>Vel. média</th><th></th></tr>
+          </thead>
+          <tbody id="tabelaRelatorio"></tbody>
+        </table>
+      </div>
+      <div id="semRelatorio" class="vazio">Escolha um período e clique em Gerar relatório.</div>
+
+      <div id="mapaCorridaDetalhe" style="display:none;">
+        <h3 style="font-size:15px;margin-top:20px;">Rota da corrida selecionada</h3>
+        <div id="mapaDetalhe" style="height:360px;border-radius:8px;"></div>
+      </div>
+    </section>
+
+    <section class="painel-secao" id="secao-tokens">
+      <h2 style="font-size:16px;">Gerenciar tokens de acesso</h2>
+      <div class="form-token">
+        <label>Nome do coordenador</label>
+        <input type="text" id="novoNome" placeholder="Ex: João - Diretor Devisa">
+        <label>Nível de acesso</label>
+        <select id="novoNivel">
+          <option value="departamento">Coordenador de departamento</option>
+          <option value="senior">Administrador sênior (vê toda a frota)</option>
+        </select>
+        <div id="campoDepartamentoNovo">
+          <label>Departamento</label>
+          <input type="text" id="novoDepartamento" placeholder="Ex: Devisa">
+        </div>
+        <label>Token</label>
+        <input type="text" id="novoToken" placeholder="Ex: DEVISA2026">
+        <button id="btnCriarToken">Criar token</button>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Coordenador</th><th>Nível</th><th>Departamento</th><th>Token</th><th>Status</th></tr>
+        </thead>
+        <tbody id="tabelaTokens"></tbody>
+      </table>
+    </section>
+
+    <section class="painel-secao" id="secao-config">
+      <h2 style="font-size:16px;">Configurações</h2>
+      <div id="config-logo">
+        <label style="font-size:13px;">Trocar logo do sistema</label><br>
+        <input type="file" id="inputLogo" accept="image/*" style="margin-top:8px;">
+        <button id="btnEnviarLogo" style="margin-top:10px;padding:8px 14px;background:#2e7d32;color:#fff;border:none;border-radius:6px;cursor:pointer;">Enviar nova logo</button>
+        <div id="statusLogo" style="font-size:13px;margin-top:8px;"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="modalApagarVeiculo" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:1000;">
+  <div style="background:#fff;border-radius:10px;padding:20px;max-width:340px;width:90%;">
+    <h3 style="margin-top:0;font-size:16px;">Apagar veículo <span id="placaModalApagar"></span></h3>
+    <label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-top:12px;">
+      <input type="checkbox" id="checkApagarVeiculo"> Remover o veículo da lista de cadastro
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-top:10px;">
+      <input type="checkbox" id="checkApagarHistorico"> Apagar histórico de corridas, posições e alertas
+    </label>
+    <div style="display:flex;gap:10px;margin-top:18px;">
+      <button id="btnCancelarApagar" style="flex:1;padding:10px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">Cancelar</button>
+      <button id="btnConfirmarApagar" style="flex:1;padding:10px;border-radius:6px;border:none;background:#c62828;color:#fff;cursor:pointer;">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+<script>
+  const SUPABASE_URL = "https://lfjkcozifntthmtqxtjr.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_culet5DEMmt9cxnYhIw82Q_ctH0XoTv";
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const LOGO_URL = "https://lfjkcozifntthmtqxtjr.supabase.co/storage/v1/object/public/arquivos/logo.png.jpg";
+
+  let usuario = null; // { token, nome, nivel, departamento }
+  let map = null;
+  let marcadores = {};
+  let linhas = {};
+
+  // ---------- LOGIN ----------
+  document.getElementById('olhoToggle').addEventListener('click', () => {
+    const input = document.getElementById('tokenInput');
+    const label = document.getElementById('olhoToggle');
+    if (input.type === 'password') {
+      input.type = 'text';
+      label.textContent = 'ocultar';
+    } else {
+      input.type = 'password';
+      label.textContent = 'mostrar';
+    }
+  });
+
+  document.getElementById('btnEntrar').addEventListener('click', fazerLogin);
+  document.getElementById('tokenInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') fazerLogin();
+  });
+
+  async function fazerLogin() {
+    const token = document.getElementById('tokenInput').value.trim();
+    if (!token) return;
+    const { data, error } = await db
+      .from('tokens_acesso')
+      .select('*')
+      .eq('token', token)
+      .eq('ativo', true)
+      .maybeSingle();
+
+    if (error || !data) {
+      document.getElementById('erro-login').style.display = 'block';
+      return;
+    }
+
+    usuario = { token: data.token, nome: data.nome_coordenador, nivel: data.nivel, departamento: data.departamento };
+    sessionStorage.setItem('rastreamento_usuario', JSON.stringify(usuario));
+
+    await db.from('log_acessos').insert({ token: usuario.token, nome_coordenador: usuario.nome, acao: 'login' });
+
+    entrarNoApp();
+  }
+
+  function entrarNoApp() {
+    document.getElementById('tela-login').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('nomeUsuario').textContent = usuario.nome;
+    const nivelTexto = usuario.nivel === 'master' ? 'Administrador master' : usuario.nivel === 'senior' ? 'Administrador sênior' : 'Coordenador - ' + (usuario.departamento || '');
+    document.getElementById('nivelUsuario').textContent = nivelTexto;
+
+    if (usuario.nivel === 'master') {
+      document.getElementById('navTokens').style.display = 'inline-block';
+      document.getElementById('navConfig').style.display = 'inline-block';
+    }
+
+    inicializarMapa();
+    carregarTudo();
+    setInterval(carregarTudo, 10000);
+  }
+
+  document.getElementById('btnSair').addEventListener('click', () => {
+    sessionStorage.removeItem('rastreamento_usuario');
+    location.reload();
+  });
+
+  // Sessão persistente
+  const salvo = sessionStorage.getItem('rastreamento_usuario');
+  if (salvo) {
+    usuario = JSON.parse(salvo);
+    window.addEventListener('DOMContentLoaded', entrarNoApp);
+  }
+
+  // ---------- NAVEGAÇÃO ----------
+  document.querySelectorAll('nav button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('nav button').forEach(b => b.classList.remove('ativo'));
+      btn.classList.add('ativo');
+      document.querySelectorAll('.painel-secao').forEach(s => s.classList.remove('ativo'));
+      document.getElementById('secao-' + btn.dataset.aba).classList.add('ativo');
+      if (btn.dataset.aba === 'tokens') carregarTokens();
+    });
+  });
+
+  // ---------- MAPA ----------
+  let clusterGroup = null;
+
+  function inicializarMapa() {
+    map = L.map('mapa').setView([-1.4558, -48.4902], 12); // Belém como centro padrão
+
+    const ruas = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const satelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri'
+    });
+
+    L.control.layers({ 'Mapa': ruas, 'Satélite': satelite }).addTo(map);
+
+    clusterGroup = L.markerClusterGroup({ maxClusterRadius: 40, disableClusteringAtZoom: 17 });
+    map.addLayer(clusterGroup);
+  }
+
+  function podeVer(departamentoVeiculo) {
+    if (usuario.nivel === 'master' || usuario.nivel === 'senior') return true;
+    return (departamentoVeiculo || '').toLowerCase() === (usuario.departamento || '').toLowerCase();
+  }
+
+  // ---------- CARREGAR DADOS ----------
+  async function carregarTudo() {
+    const { data: veiculos } = await db.from('veiculos').select('*');
+    const { data: viagensAtivas } = await db.from('viagens').select('*').eq('status', 'ativa');
+
+    const veiculosVisiveis = (veiculos || []).filter(v => podeVer(v.departamento));
+    const viagensVisiveis = (viagensAtivas || []).filter(vi => {
+      const veic = (veiculos || []).find(v => v.placa === vi.placa);
+      return podeVer(veic ? veic.departamento : null);
+    });
+
+    atualizarMapa(viagensVisiveis, veiculosVisiveis);
+    atualizarListaAtivos(viagensVisiveis, veiculosVisiveis);
+    atualizarListaVeiculos(veiculosVisiveis, viagensVisiveis);
+    carregarAlertas(veiculosVisiveis);
+  }
+
+  function iconeCarrinho(placa, ativo) {
+    const cor = ativo ? '#2e7d32' : '#757575';
+    return L.divIcon({
+      className: '',
+      html: `<div style="display:flex;flex-direction:column;align-items:center;">
+        <div style="font-size:24px;line-height:1;">🚗</div>
+        <div style="background:${cor};color:#fff;font-size:10px;font-weight:bold;padding:1px 5px;border-radius:4px;white-space:nowrap;margin-top:-2px;">${placa}</div>
+      </div>`,
+      iconSize: [50, 40],
+      iconAnchor: [25, 20]
+    });
+  }
+
+  function atualizarMapa(viagensAtivas, veiculos) {
+    const placasAtivas = new Set(viagensAtivas.map(v => v.placa));
+    const placasComVeiculo = new Set(veiculos.map(v => v.placa));
+
+    Object.keys(marcadores).forEach(placa => {
+      if (!placasComVeiculo.has(placa)) {
+        clusterGroup.removeLayer(marcadores[placa]);
+        delete marcadores[placa];
+        if (linhas[placa]) { map.removeLayer(linhas[placa]); delete linhas[placa]; }
+      }
+    });
+
+    veiculos.forEach(async (veic) => {
+      if (veic.ultima_lat === null || veic.ultima_lat === undefined) return;
+
+      const ativo = placasAtivas.has(veic.placa);
+      const viagem = viagensAtivas.find(v => v.placa === veic.placa);
+      const posicao = [veic.ultima_lat, veic.ultima_lng];
+      const statusTexto = ativo ? ('Em corrida - ' + (viagem ? viagem.motorista_nome : '')) : 'Recolhido';
+      const ultimaAtualizacao = veic.ultima_atualizacao ? new Date(veic.ultima_atualizacao).toLocaleString('pt-BR') : '-';
+      const popupTexto = `<b>${veic.placa}</b> - ${statusTexto}<br>Velocidade: ${veic.ultima_velocidade ? veic.ultima_velocidade.toFixed(0) + ' km/h' : '-'}<br>Última atualização: ${ultimaAtualizacao}`;
+
+      if (marcadores[veic.placa]) {
+        marcadores[veic.placa].setLatLng(posicao).setPopupContent(popupTexto).setIcon(iconeCarrinho(veic.placa, ativo));
+      } else {
+        marcadores[veic.placa] = L.marker(posicao, { icon: iconeCarrinho(veic.placa, ativo) }).bindPopup(popupTexto);
+        clusterGroup.addLayer(marcadores[veic.placa]);
+      }
+
+      if (ativo && viagem) {
+        const { data: pontos } = await db
+          .from('posicoes')
+          .select('lat,lng')
+          .eq('viagem_id', viagem.id)
+          .order('criado_em', { ascending: true });
+
+        if (pontos && pontos.length > 1) {
+          const linha = pontos.map(p => [p.lat, p.lng]);
+          if (linhas[veic.placa]) {
+            linhas[veic.placa].setLatLngs(linha);
+          } else {
+            linhas[veic.placa] = L.polyline(linha, { color: '#2e7d32' }).addTo(map);
+          }
+        }
+      } else if (linhas[veic.placa]) {
+        map.removeLayer(linhas[veic.placa]);
+        delete linhas[veic.placa];
+      }
+    });
+  }
+
+  function atualizarListaAtivos(viagensAtivas, veiculos) {
+    const cont = document.getElementById('listaAtivos');
+    if (viagensAtivas.length === 0) {
+      cont.innerHTML = '<div class="vazio">Nenhum veículo em corrida no momento.</div>';
+      return;
+    }
+    cont.innerHTML = viagensAtivas.map(viagem => {
+      const veic = veiculos.find(v => v.placa === viagem.placa) || {};
+      const inicio = new Date(viagem.inicio).toLocaleTimeString('pt-BR');
+      return `
+        <div class="veiculo-card">
+          <div class="veiculo-info">
+            <b>${viagem.placa}</b> <span class="badge badge-ativo">Em corrida</span><br>
+            <div>${viagem.motorista_nome} - Mat. ${viagem.matricula}</div>
+            <div>Departamento: ${veic.departamento || '-'} ${veic.setor ? '/ ' + veic.setor : ''}</div>
+            <div>Desde: ${inicio} - Velocidade atual: ${veic.ultima_velocidade ? veic.ultima_velocidade.toFixed(0) + ' km/h' : '-'}</div>
+          </div>
+          <button class="encerrar" onclick="encerrarCorrida('${viagem.id}')">Encerrar corrida</button>
+        </div>`;
+    }).join('');
+  }
+
+  function atualizarListaVeiculos(veiculos, viagensAtivas) {
+    const placasAtivas = new Set(viagensAtivas.map(v => v.placa));
+    const cont = document.getElementById('listaVeiculos');
+    if (veiculos.length === 0) {
+      cont.innerHTML = '<div class="vazio">Nenhum veículo cadastrado ainda.</div>';
+      return;
+    }
+    const podeExcluir = usuario.nivel === 'master' || usuario.nivel === 'senior';
+    cont.innerHTML = veiculos.map(v => {
+      const ativo = placasAtivas.has(v.placa);
+      const ultima = v.ultima_atualizacao ? new Date(v.ultima_atualizacao).toLocaleString('pt-BR') : 'sem registro';
+      return `
+        <div class="veiculo-card">
+          <div class="veiculo-info">
+            <b>${v.placa}</b> <span class="badge ${ativo ? 'badge-ativo' : 'badge-recolhido'}">${ativo ? 'Em corrida' : 'Recolhido'}</span><br>
+            <div>${v.modelo || '-'} - ${v.departamento || '-'} ${v.setor ? '/ ' + v.setor : ''}</div>
+            <div>Última localização: ${ultima}</div>
+          </div>
+          ${podeExcluir && !ativo ? `<button class="encerrar" onclick="abrirModalApagar('${v.placa}')">Apagar veículo</button>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  let placaParaApagar = null;
+
+  function abrirModalApagar(placa) {
+    placaParaApagar = placa;
+    document.getElementById('placaModalApagar').textContent = placa;
+    document.getElementById('checkApagarVeiculo').checked = true;
+    document.getElementById('checkApagarHistorico').checked = false;
+    document.getElementById('modalApagarVeiculo').style.display = 'flex';
+  }
+
+  function fecharModalApagar() {
+    document.getElementById('modalApagarVeiculo').style.display = 'none';
+    placaParaApagar = null;
+  }
+
+  document.getElementById('btnCancelarApagar').addEventListener('click', fecharModalApagar);
+
+  document.getElementById('btnConfirmarApagar').addEventListener('click', async () => {
+    if (!placaParaApagar) return;
+    const apagarVeiculo = document.getElementById('checkApagarVeiculo').checked;
+    const apagarHistorico = document.getElementById('checkApagarHistorico').checked;
+
+    if (!apagarVeiculo && !apagarHistorico) {
+      alert('Marque pelo menos uma opção.');
+      return;
+    }
+
+    if (apagarHistorico) {
+      await db.from('viagens').delete().eq('placa', placaParaApagar);
+    }
+    if (apagarVeiculo) {
+      await db.from('veiculos').delete().eq('placa', placaParaApagar);
+    }
+
+    await db.from('log_acessos').insert({
+      token: usuario.token,
+      nome_coordenador: usuario.nome,
+      acao: `apagou veículo ${placaParaApagar} (veículo: ${apagarVeiculo ? 'sim' : 'não'}, histórico: ${apagarHistorico ? 'sim' : 'não'})`
+    });
+
+    fecharModalApagar();
+    carregarTudo();
+  });
+
+  async function encerrarCorrida(viagemId) {
+    if (!confirm('Encerrar essa corrida agora?')) return;
+    await db.from('viagens').update({ status: 'finalizada', fim: new Date().toISOString() }).eq('id', viagemId);
+    await db.from('log_acessos').insert({ token: usuario.token, nome_coordenador: usuario.nome, acao: 'encerrou corrida ' + viagemId });
+    carregarTudo();
+  }
+
+  // ---------- ALERTAS ----------
+  async function carregarAlertas(veiculosVisiveis) {
+    const placasVisiveis = new Set(veiculosVisiveis.map(v => v.placa));
+    const { data: alertas } = await db.from('alertas').select('*').order('criado_em', { ascending: false }).limit(200);
+    const filtrados = (alertas || []).filter(a => placasVisiveis.has(a.placa));
+
+    const tbody = document.getElementById('tabelaAlertas');
+    if (filtrados.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="vazio">Nenhum alerta registrado.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtrados.map(a => `
+      <tr>
+        <td>${a.placa}</td>
+        <td>${a.tipo === 'excesso_velocidade' ? 'Excesso de velocidade' : 'Parada suspeita'}</td>
+        <td>${a.valor ? a.valor.toFixed(0) : '-'}</td>
+        <td>${new Date(a.criado_em).toLocaleString('pt-BR')}</td>
+      </tr>`).join('');
+  }
+
+  // ---------- RELATÓRIOS ----------
+  let mapaDetalheInstance = null;
+  let ultimoRelatorio = null;
+
+  function distanciaKm(lat1, lng1, lat2, lng2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  document.getElementById('btnGerarRelatorio').addEventListener('click', gerarRelatorio);
+
+  async function gerarRelatorio() {
+    const dataInicio = document.getElementById('filtroDataInicio').value;
+    const dataFim = document.getElementById('filtroDataFim').value;
+    const filtroPlaca = document.getElementById('filtroPlaca').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const filtroDepartamento = document.getElementById('filtroDepartamentoRelatorio').value.trim().toLowerCase();
+
+    let query = db.from('viagens').select('*').order('inicio', { ascending: false });
+    if (dataInicio) query = query.gte('inicio', dataInicio + 'T00:00:00');
+    if (dataFim) query = query.lte('inicio', dataFim + 'T23:59:59');
+    if (filtroPlaca) query = query.eq('placa', filtroPlaca);
+
+    const { data: viagens } = await query;
+    const { data: veiculos } = await db.from('veiculos').select('*');
+
+    const veiculosMap = {};
+    (veiculos || []).forEach(v => veiculosMap[v.placa] = v);
+
+    let viagensFiltradas = (viagens || []).filter(vi => {
+      const veic = veiculosMap[vi.placa];
+      if (!podeVer(veic ? veic.departamento : null)) return false;
+      if (filtroDepartamento && (!veic || (veic.departamento || '').toLowerCase() !== filtroDepartamento)) return false;
+      return true;
+    });
+
+    if (viagensFiltradas.length === 0) {
+      document.getElementById('resumoRelatorio').style.display = 'none';
+      document.getElementById('mapaCorridaDetalhe').style.display = 'none';
+      document.getElementById('semRelatorio').style.display = 'block';
+      document.getElementById('semRelatorio').textContent = 'Nenhuma corrida encontrada para esse filtro.';
+      return;
+    }
+
+    // Calcula km aproximado, tempo de deslocamento e velocidade média de cada viagem
+    let totalKm = 0;
+    let totalHoras = 0;
+    const linhasTabela = [];
+    for (const viagem of viagensFiltradas) {
+      const { data: pontos } = await db.from('posicoes').select('lat,lng').eq('viagem_id', viagem.id).order('criado_em', { ascending: true });
+      let km = 0;
+      if (pontos && pontos.length > 1) {
+        for (let i = 1; i < pontos.length; i++) {
+          km += distanciaKm(pontos[i - 1].lat, pontos[i - 1].lng, pontos[i].lat, pontos[i].lng);
+        }
+      }
+      const fimReferencia = viagem.fim ? new Date(viagem.fim) : new Date();
+      const horas = (fimReferencia - new Date(viagem.inicio)) / (1000 * 60 * 60);
+      const velMedia = horas > 0 ? km / horas : 0;
+
+      totalKm += km;
+      totalHoras += horas;
+      const veic = veiculosMap[viagem.placa] || {};
+      linhasTabela.push({ viagem, veic, km, horas, velMedia });
+    }
+
+    const idsViagens = viagensFiltradas.map(v => v.id);
+    const { data: alertasPeriodo } = await db.from('alertas').select('*').in('viagem_id', idsViagens);
+    const excessos = (alertasPeriodo || []).filter(a => a.tipo === 'excesso_velocidade').length;
+    const paradas = (alertasPeriodo || []).filter(a => a.tipo === 'parada_suspeita').length;
+    const velMediaGeral = totalHoras > 0 ? totalKm / totalHoras : 0;
+
+    function formatarHoras(horas) {
+      const h = Math.floor(horas);
+      const m = Math.round((horas - h) * 60);
+      return h + 'h' + String(m).padStart(2, '0') + 'min';
+    }
+
+    document.getElementById('resCorridas').textContent = viagensFiltradas.length;
+    document.getElementById('resKm').textContent = totalKm.toFixed(0);
+    document.getElementById('resExcessos').textContent = excessos;
+    document.getElementById('resParadas').textContent = paradas;
+    document.getElementById('resVelMedia').textContent = velMediaGeral.toFixed(0) + ' km/h';
+    document.getElementById('resTempo').textContent = formatarHoras(totalHoras);
+
+    document.getElementById('tabelaRelatorio').innerHTML = linhasTabela.map(({ viagem, veic, km, horas, velMedia }) => `
+      <tr>
+        <td>${viagem.placa}</td>
+        <td>${viagem.motorista_nome}</td>
+        <td>${veic.departamento || '-'}</td>
+        <td>${new Date(viagem.inicio).toLocaleString('pt-BR')}</td>
+        <td>${viagem.fim ? new Date(viagem.fim).toLocaleString('pt-BR') : 'em andamento'}</td>
+        <td>${km.toFixed(1)}</td>
+        <td>${formatarHoras(horas)}</td>
+        <td>${velMedia.toFixed(0)} km/h</td>
+        <td><button class="encerrar" style="background:#2e7d32;" onclick="verRotaCorrida('${viagem.id}')">Ver rota</button></td>
+      </tr>`).join('');
+
+    document.getElementById('semRelatorio').style.display = 'none';
+    document.getElementById('resumoRelatorio').style.display = 'block';
+
+    ultimoRelatorio = {
+      linhasTabela,
+      resumo: { corridas: viagensFiltradas.length, km: totalKm, excessos, paradas, velMediaGeral, totalHoras },
+      filtros: { dataInicio, dataFim, filtroPlaca, filtroDepartamento }
+    };
+
+    document.getElementById('btnImprimirRelatorio').style.display = 'inline-block';
+    document.getElementById('btnExportarExcel').style.display = 'inline-block';
+    document.getElementById('btnExportarPdf').style.display = 'inline-block';
+
+    const agora = new Date().toLocaleString('pt-BR');
+    const periodoTexto = (dataInicio || dataFim) ? `Período: ${dataInicio || 'início'} até ${dataFim || 'hoje'}` : 'Período: todas as corridas';
+    document.getElementById('infoImpressao').innerHTML = `${periodoTexto}<br>Gerado em: ${agora}`;
+  }
+
+  async function verRotaCorrida(viagemId) {
+    const { data: pontos } = await db.from('posicoes').select('lat,lng').eq('viagem_id', viagemId).order('criado_em', { ascending: true });
+    const cont = document.getElementById('mapaCorridaDetalhe');
+    cont.style.display = 'block';
+    cont.scrollIntoView({ behavior: 'smooth' });
+
+    if (mapaDetalheInstance) {
+      mapaDetalheInstance.remove();
+      mapaDetalheInstance = null;
+    }
+
+    mapaDetalheInstance = L.map('mapaDetalhe');
+    const ruasDetalhe = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(mapaDetalheInstance);
+    const sateliteDetalhe = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri'
+    });
+    L.control.layers({ 'Mapa': ruasDetalhe, 'Satélite': sateliteDetalhe }).addTo(mapaDetalheInstance);
+
+    if (pontos && pontos.length > 0) {
+      const linha = pontos.map(p => [p.lat, p.lng]);
+      L.polyline(linha, { color: '#2e7d32' }).addTo(mapaDetalheInstance);
+      L.marker(linha[0]).addTo(mapaDetalheInstance).bindPopup('Início');
+      L.marker(linha[linha.length - 1]).addTo(mapaDetalheInstance).bindPopup('Fim / posição atual');
+      mapaDetalheInstance.fitBounds(linha);
+    } else {
+      mapaDetalheInstance.setView([-1.4558, -48.4902], 12);
+    }
+  }
+
+  document.getElementById('btnImprimirRelatorio').addEventListener('click', () => {
+    window.print();
+  });
+
+  document.getElementById('btnExportarExcel').addEventListener('click', () => {
+    if (!ultimoRelatorio) return;
+    const linhas = ultimoRelatorio.linhasTabela.map(({ viagem, veic, km, horas, velMedia }) => ({
+      Placa: viagem.placa,
+      Motorista: viagem.motorista_nome,
+      Matricula: viagem.matricula,
+      Departamento: veic.departamento || '-',
+      Setor: veic.setor || '-',
+      Inicio: new Date(viagem.inicio).toLocaleString('pt-BR'),
+      Fim: viagem.fim ? new Date(viagem.fim).toLocaleString('pt-BR') : 'em andamento',
+      'Km aprox.': Number(km.toFixed(1)),
+      'Tempo (horas)': Number(horas.toFixed(2)),
+      'Vel. média (km/h)': Number(velMedia.toFixed(0))
+    }));
+
+    const planilha = XLSX.utils.json_to_sheet(linhas);
+    const livro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(livro, planilha, 'Relatorio');
+
+    const resumoLinhas = [
+      { Indicador: 'Corridas', Valor: ultimoRelatorio.resumo.corridas },
+      { Indicador: 'Km percorridos (aprox.)', Valor: Number(ultimoRelatorio.resumo.km.toFixed(0)) },
+      { Indicador: 'Excessos de velocidade', Valor: ultimoRelatorio.resumo.excessos },
+      { Indicador: 'Paradas suspeitas', Valor: ultimoRelatorio.resumo.paradas }
+    ];
+    const planilhaResumo = XLSX.utils.json_to_sheet(resumoLinhas);
+    XLSX.utils.book_append_sheet(livro, planilhaResumo, 'Resumo');
+
+    const dataArquivo = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(livro, `relatorio_rastreamento_${dataArquivo}.xlsx`);
+  });
+
+  async function imagemParaBase64(url) {
+    try {
+      const resposta = await fetch(url);
+      const blob = await resposta.blob();
+      return await new Promise((resolve, reject) => {
+        const leitor = new FileReader();
+        leitor.onload = () => resolve(leitor.result);
+        leitor.onerror = reject;
+        leitor.readAsDataURL(blob);
+      });
+    } catch (e) {
+      return null;
+    }
+  }
+
+  document.getElementById('btnExportarPdf').addEventListener('click', async () => {
+    if (!ultimoRelatorio) return;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const logoBase64 = await imagemParaBase64(LOGO_URL);
+    let yInicial = 15;
+    if (logoBase64) {
+      doc.addImage(logoBase64, 'JPEG', 14, 10, 30, 18);
+      yInicial = 32;
+    }
+
+    doc.setFontSize(14);
+    doc.text('Relatório de Rastreamento - SESMA', 14, yInicial + 4);
+
+    doc.setFontSize(9);
+    const agora = new Date().toLocaleString('pt-BR');
+    const f = ultimoRelatorio.filtros;
+    const periodoTexto = (f.dataInicio || f.dataFim) ? `Período: ${f.dataInicio || 'início'} até ${f.dataFim || 'hoje'}` : 'Período: todas as corridas';
+    doc.text(periodoTexto + ' | Gerado em: ' + agora, 14, yInicial + 10);
+
+    doc.setFontSize(10);
+    const r = ultimoRelatorio.resumo;
+    doc.text(`Corridas: ${r.corridas}    Km aprox.: ${r.km.toFixed(0)}    Excessos: ${r.excessos}    Paradas suspeitas: ${r.paradas}    Vel. média: ${r.velMediaGeral.toFixed(0)} km/h`, 14, yInicial + 18);
+
+    const linhasPdf = ultimoRelatorio.linhasTabela.map(({ viagem, veic, km, horas, velMedia }) => [
+      viagem.placa,
+      viagem.motorista_nome,
+      veic.departamento || '-',
+      new Date(viagem.inicio).toLocaleString('pt-BR'),
+      viagem.fim ? new Date(viagem.fim).toLocaleString('pt-BR') : 'em andamento',
+      km.toFixed(1),
+      horas.toFixed(1) + 'h',
+      velMedia.toFixed(0) + ' km/h'
+    ]);
+
+    doc.autoTable({
+      startY: yInicial + 24,
+      head: [['Placa', 'Motorista', 'Departamento', 'Início', 'Fim', 'Km aprox.', 'Tempo', 'Vel. média']],
+      body: linhasPdf,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [46, 125, 50] }
+    });
+
+    const dataArquivo = new Date().toISOString().slice(0, 10);
+    doc.save(`relatorio_rastreamento_${dataArquivo}.pdf`);
+  });
+
+  // ---------- TOKENS (somente master) ----------
+  document.getElementById('novoNivel').addEventListener('change', (e) => {
+    document.getElementById('campoDepartamentoNovo').style.display = e.target.value === 'departamento' ? 'block' : 'none';
+  });
+
+  document.getElementById('btnCriarToken').addEventListener('click', async () => {
+    const nome = document.getElementById('novoNome').value.trim();
+    const nivel = document.getElementById('novoNivel').value;
+    const departamento = document.getElementById('novoDepartamento').value.trim();
+    const token = document.getElementById('novoToken').value.trim();
+
+    if (!nome || !token) {
+      alert('Preencha nome e token.');
+      return;
+    }
+    if (nivel === 'departamento' && !departamento) {
+      alert('Preencha o departamento.');
+      return;
+    }
+
+    const { error } = await db.from('tokens_acesso').insert({
+      token: token,
+      nome_coordenador: nome,
+      nivel: nivel,
+      departamento: nivel === 'departamento' ? departamento : null,
+      ativo: true
+    });
+
+    if (error) {
+      alert('Erro ao criar token. Verifique se esse token já existe.');
+      return;
+    }
+
+    document.getElementById('novoNome').value = '';
+    document.getElementById('novoDepartamento').value = '';
+    document.getElementById('novoToken').value = '';
+    carregarTokens();
+  });
+
+  async function carregarTokens() {
+    const { data: tokens } = await db.from('tokens_acesso').select('*').order('criado_em', { ascending: false });
+    const tbody = document.getElementById('tabelaTokens');
+    tbody.innerHTML = (tokens || []).map(t => `
+      <tr>
+        <td>${t.nome_coordenador}</td>
+        <td>${t.nivel}</td>
+        <td>${t.departamento || '-'}</td>
+        <td>${t.token}</td>
+        <td class="toggle-ativo" onclick="alternarToken('${t.id}', ${t.ativo})">
+          ${t.ativo ? '<span class="badge badge-ativo">Ativo</span>' : '<span class="badge badge-recolhido">Inativo</span>'}
+        </td>
+      </tr>`).join('');
+  }
+
+  async function alternarToken(id, ativoAtual) {
+    await db.from('tokens_acesso').update({ ativo: !ativoAtual }).eq('id', id);
+    carregarTokens();
+  }
+
+  // ---------- CONFIGURAÇÕES / LOGO ----------
+  document.getElementById('btnEnviarLogo').addEventListener('click', async () => {
+    const input = document.getElementById('inputLogo');
+    const arquivo = input.files[0];
+    if (!arquivo) {
+      alert('Escolha uma imagem primeiro.');
+      return;
+    }
+    document.getElementById('statusLogo').textContent = 'Enviando...';
+    const { error } = await db.storage.from('arquivos').upload('logo.png.jpg', arquivo, { upsert: true });
+    if (error) {
+      document.getElementById('statusLogo').textContent = 'Erro ao enviar logo.';
+      return;
+    }
+    document.getElementById('statusLogo').textContent = 'Logo atualizada com sucesso. Atualize a página para ver a mudança.';
+  });
+</script>
+</body>
+</html>
